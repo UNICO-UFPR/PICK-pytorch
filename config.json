@@ -57,11 +57,10 @@
     "train_dataset": {
         "type": "PICKDataset",
         "args": {
-            "files_name":"/home/Wen/data/code/PICK/PICK-pytorch/data/data_examples_root/train_samples_list.csv",
+            "files_name":"./data/train_samples_list.csv",
             "boxes_and_transcripts_folder":"boxes_and_transcripts",
             "images_folder":"images",
-            "entities_folder":"entities",
-            "iob_tagging_type":"box_and_within_box_level",
+	    "iob_tagging_type":"box_level",
             "resized_image_size": [480, 960],
             "ignore_error": false
         }
@@ -69,11 +68,10 @@
     "validation_dataset": {
         "type": "PICKDataset",
         "args": {
-            "files_name":"/home/Wen/data/code/PICK/PICK-pytorch/data/data_examples_root/train_samples_list.csv",
+            "files_name":"./data/valid.csv",
             "boxes_and_transcripts_folder":"boxes_and_transcripts",
             "images_folder":"images",
-            "entities_folder":"entities",
-            "iob_tagging_type":"box_and_within_box_level",
+	    "iob_tagging_type":"box_level",
             "resized_image_size": [480, 960],
             "ignore_error": false
         }
