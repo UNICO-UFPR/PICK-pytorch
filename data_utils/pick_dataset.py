@@ -140,7 +140,7 @@ class PICKDataset(Dataset):
                 new_item = random.randint(0, len(self) - 1)
                 return self.__getitem__(new_item)
             else:
-                raise RuntimeError('Error occurs in image {}: {}'.format(boxes_and_transcripts_file.stem, e.args))
+                raise RuntimeError('Error occurs in image {}: {}'.format(boxes_and_transcripts_file.stem, e.args)) from e
 
 
 class BatchCollateFn(object):
