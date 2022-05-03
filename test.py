@@ -52,9 +52,6 @@ def main(args):
                 if input_value is not None and isinstance(input_value, torch.Tensor):
                     input_data_item[key] = input_value.to(device)
 
-            # For easier debug.
-            image_names = input_data_item["filenames"]
-
             output = pick_model(**input_data_item)
             logits = output['logits']  # (B, N*T, out_dim)
             new_mask = output['new_mask']
