@@ -118,8 +118,8 @@ def entry_point(config: ConfigParser):
         config.update_config('global_rank', dist.get_rank())
         # info distributed training cfg
         logger.info(
-            f'[Process {os.getpid()}] world_size = {dist.get_world_size()}, '
-            + f'rank = {dist.get_rank()}, backend={dist.get_backend()}'
+            (f'[Process {os.getpid()}] world_size = {dist.get_world_size()}, '
+             f'rank = {dist.get_rank()}, backend={dist.get_backend()}')
         ) if local_master else None
 
     # start train
@@ -139,7 +139,8 @@ if __name__ == '__main__':
                       help='indices of GPUs to be available (default: all)')
 
     # custom cli options to modify configuration from default values given in json file.
-    CustomArgs = collections.namedtuple('CustomArgs', 'flags default type target help')  # CustomArgs.flags, CustomArgs.default
+    CustomArgs = collections.namedtuple(  # CustomArgs.flags, CustomArgs.default
+        'CustomArgs', 'flags default type target help')
     options = [
         # CustomArgs(['--lr', '--learning_rate'], default=0.0001, type=float, target='optimizer;args;lr',
         #            help='learning rate (default: 0.0001)'),
