@@ -35,6 +35,8 @@ def main(config: ConfigParser, local_master: bool, logger=None):
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) \
         if config['distributed'] else None
 
+    os.environ["CUDA_VISIBLE_DEVICES"]="0,1"
+    print(torch.cuda.device_count())
     is_shuffle = False if config['distributed'] else True
     train_data_loader = config.init_obj('train_data_loader', torch.utils.data.dataloader,
                                         dataset=train_dataset,

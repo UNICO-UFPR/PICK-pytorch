@@ -401,7 +401,7 @@ class Trainer:
 
             list_ids = list(range(n_gpu_use))
             if n_gpu_use > 0:
-                torch.cuda.set_device(list_ids[0])  # only use first available gpu as devices
+                torch.cuda.set_device(1)  # only use first available gpu as devices
                 self.logger_warning(f'Training is using GPU {list_ids[0]}!')
                 device = 'cuda'
             else:
