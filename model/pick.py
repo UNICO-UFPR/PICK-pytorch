@@ -94,7 +94,7 @@ class PICKModel(nn.Module):
         text_length = kwargs['text_length']  # (B, N)
         iob_tags_label = kwargs['iob_tags_label'] if self.training else None  # (B, N, T)
         mask = kwargs['mask']  # (B, N, T)
-        boxes_coordinate = kwargs['boxes_coordinate']  # (B, num_boxes, 8)
+        boxes_coordinate = kwargs['boxes_coordinate']  # (B, N, 8)
 
         ##### Forward Begin #####
         ### Encoder module ###
