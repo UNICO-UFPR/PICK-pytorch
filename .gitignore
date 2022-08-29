@@ -1,3 +1,5 @@
+data/rg-gfuhr
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -103,6 +105,9 @@ ENV/
 # input data, saved log, checkpoints
 input/
 saved/
+predict_results/
+datasets/
+data/
 
 # editor, os cache directory
 .vscode/
