@@ -12,6 +12,19 @@ from .class_utils import keys_vocab_cls, iob_labels_vocab_cls
 from data_utils import documents
 
 
+def is_none_fn(val):
+    return val is None
+
+def is_nnone_fn(val):
+    return not is_none_fn(val)
+
+def id_fn(val):
+    return val
+
+def set_prep(val, cond_fn=is_none_fn, ok_fn=id_fn, nok_fn=id_fn):
+    return ok_fn(val) if cond_fn(val) else nok_fn(val)
+
+
 def ensure_dir(dirname):
     dirname = Path(dirname)
     if not dirname.is_dir():
