@@ -30,7 +30,7 @@ IOBTagsField.vocab = iob_labels_vocab_cls
 class Document:
     def __init__(self, boxes_and_transcripts_file: Path, image_file: Path,
                  resized_image_size: Tuple[int, int] = (480, 960),
-                 iob_tagging_type: str = 'box_level', entities_file: Path = None, training: bool = True,
+                 iob_tagging_type: str = 'box_level', entities_file: Path = None,
                  image_index=None):
         '''
         An item returned by dataset.
@@ -40,12 +40,10 @@ class Document:
         :param resized_image_size: resize whole image size, (w, h)
         :param iob_tagging_type: 'box_level', 'document_level', 'box_and_within_box_level'
         :param entities_file: exactly entity type and entity value of documents, json file
-        :param training: True for train and validation mode, False for test mode. True will also load labels,
         and entities_file must be set.
         :param image_index: image index, used to get image file name
         '''
         self.resized_image_size = resized_image_size
-        self.training = training
         assert iob_tagging_type in ['box_level', 'document_level', 'box_and_within_box_level'], \
             'iob tagging type {} is not supported'.format(iob_tagging_type)
         self.iob_tagging_type = iob_tagging_type
@@ -58,12 +56,7 @@ class Document:
             # read boxes, transcripts, and entity types of boxes in one documents from boxes_and_transcripts file
             # match with regex pattern: index,x1,y1,x2,y2,x3,y3,x4,y4,transcript,type from boxes_and_transcripts tsv file
             # data format as [(index, points, transcription, entity_type)...]
-            if self.training:
-                # boxes_and_transcripts_data = [(index, [x1, y1, ...], transcript, entity_type), ...]
-                boxes_and_transcripts_data = read_gt_file_with_box_entity_type(boxes_and_transcripts_file.as_posix())
-            else:
-                boxes_and_transcripts_data = read_ocr_file_without_box_entity_type(
-                    boxes_and_transcripts_file.as_posix())
+            boxes_and_transcripts_data = read_gt_file_with_box_entity_type(boxes_and_transcripts_file.as_posix())
 
             # Sort the box based on the position.
             boxes_and_transcripts_data = sort_box_with_list(boxes_and_transcripts_data)
@@ -74,19 +67,12 @@ class Document:
             raise IOError('Error occurs in image {}: {}'.format(image_file.stem, e.args))
 
         boxes, transcripts, box_entity_types = [], [], []
-        if self.training:
-            for index, points, transcript, entity_type in boxes_and_transcripts_data:
-                if len(transcript) == 0:
-                    transcript = ' '
-                boxes.append(points)
-                transcripts.append(transcript)
-                box_entity_types.append(entity_type)
-        else:
-            for index, points, transcript in boxes_and_transcripts_data:
-                if len(transcript) == 0:
-                    transcript = ' '
-                boxes.append(points)
-                transcripts.append(transcript)
+        for index, points, transcript, entity_type in boxes_and_transcripts_data:
+            if len(transcript) == 0:
+                transcript = ' '
+            boxes.append(points)
+            transcripts.append(transcript)
+            box_entity_types.append(entity_type)
 
         # Limit the number of boxes and number of transcripts to process.
         boxes_num = min(len(boxes), MAX_BOXES_NUM)
@@ -132,29 +118,27 @@ class Document:
             # The length of texts of each segment.
             text_segments = [list(trans) for trans in transcripts[:boxes_num]]
 
-            if self.training:
-                # assign iob label to input text through exactly match way, this process needs entity-level label
-                if self.iob_tagging_type != 'box_level':
-                    with entities_file.open() as f:
-                        entities = json.load(f)
+            # assign iob label to input text through exactly match way, this process needs entity-level label
+            if self.iob_tagging_type != 'box_level':
+                with entities_file.open() as f:
+                    entities = json.load(f)
 
-                if self.iob_tagging_type == 'box_level':
-                    # convert transcript of every boxes to iob label, using entity type of corresponding box
-                    iob_tags_label = text2iob_label_with_box_level_match(box_entity_types[:boxes_num],
-                                                                         transcripts[:boxes_num])
-                elif self.iob_tagging_type == 'document_level':
-                    # convert transcripts to iob label using document level tagging match method, all transcripts will
-                    # be concatenated as a sequences
-                    iob_tags_label = text2iob_label_with_document_level_exactly_match(transcripts[:boxes_num], entities)
+            if self.iob_tagging_type == 'box_level':
+                # convert transcript of every boxes to iob label, using entity type of corresponding box
+                iob_tags_label = text2iob_label_with_box_level_match(
+                    box_entity_types[:boxes_num], transcripts[:boxes_num])
+            elif self.iob_tagging_type == 'document_level':
+                # convert transcripts to iob label using document level tagging match method, all transcripts will
+                # be concatenated as a sequences
+                iob_tags_label = text2iob_label_with_document_level_exactly_match(transcripts[:boxes_num], entities)
 
-                elif self.iob_tagging_type == 'box_and_within_box_level':
-                    # perform exactly tagging within specific box, box_level_entities parames will perform boex level tagging.
-                    iob_tags_label = text2iob_label_with_box_and_within_box_exactly_level(box_entity_types[:boxes_num],
-                                                                                          transcripts[:boxes_num],
-                                                                                          entities, ['address'])
+            elif self.iob_tagging_type == 'box_and_within_box_level':
+                # perform exactly tagging within specific box, box_level_entities parames will perform boex level tagging.
+                iob_tags_label = text2iob_label_with_box_and_within_box_exactly_level(
+                    box_entity_types[:boxes_num], transcripts[:boxes_num], entities, ['address'])
 
-                iob_tags_label = IOBTagsField.process(iob_tags_label)[:, :transcript_len].numpy()
-                box_entity_types = [entities_vocab_cls.stoi[t] for t in box_entity_types[:boxes_num]]
+            iob_tags_label = IOBTagsField.process(iob_tags_label)[:, :transcript_len].numpy()
+            box_entity_types = [entities_vocab_cls.stoi[t] for t in box_entity_types[:boxes_num]]
 
             # texts shape is (num_texts, max_texts_len), texts_len shape is (num_texts,)
             texts, texts_len = TextSegmentsField.process(text_segments)
@@ -172,10 +156,8 @@ class Document:
             self.mask = RawField().preprocess(mask)
             self.boxes_num = RawField().preprocess(boxes_num)
             self.transcript_len = RawField().preprocess(transcript_len)  # max transcript len of current document
-            if self.training:
-                self.iob_tags_label = IOBTagsField.preprocess(iob_tags_label)
-            else:
-                self.image_index = RawField().preprocess(image_index)
+            self.iob_tags_label = IOBTagsField.preprocess(iob_tags_label)
+            self.image_index = RawField().preprocess(image_index)
 
         except Exception as e:
             raise RuntimeError('Error occurs in image {}: {}'.format(boxes_and_transcripts_file.stem, e.args))
