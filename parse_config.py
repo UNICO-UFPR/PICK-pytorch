@@ -176,3 +176,14 @@ def _set_by_path(tree, keys, value):
 def _get_by_path(tree, keys):
     """Access a nested object in tree by sequence of keys."""
     return reduce(getitem, keys, tree)
+
+# helpers for argparse
+def strtobool(val: str) -> int:
+    # https://docs.python.org/3/distutils/apiref.html#distutils.util.strtobool
+    vall = val.lower()
+    if vall in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif vall in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError(f'Can\'t decode string {val} to boolean.')

@@ -1,6 +1,8 @@
 import csv
 import sys
+from pathlib import Path
 from glob import glob
+
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
@@ -140,10 +142,10 @@ def compare(f1, f2, cl):
 
 def get_file_names(csv_file, classe=""):
     with open(csv_file, "r") as cr:
-        ret = [x[-1].replace("jpg", "tsv") for x in csv.reader(cr) if classe in x[1]]
+        ret = [x[-1] + '.tsv' for x in csv.reader(cr) if classe in x[1]]
     return ret
 
-def main(argv, classe="", md="w", n_it='4'):
+def main(argv, classe="", md="w"):
     global conf_matrix
     conf_matrix = {}
     global astm, aste
@@ -156,10 +158,11 @@ def main(argv, classe="", md="w", n_it='4'):
     prerr = {}
     irr = []
     fs = get_file_names(argv[0], classe=classe)
-    gt = [f"./t1/" + x for x in fs]
-    pred = [f"./out{n_it}/" + x.replace(".tsv", ".txt") for x in fs]
-    # n_it = "4"
-    with open(f"./aux{n_it}/errorLog_{classe}.txt", "w") as logger:
+    gt = [f"{argv[1]}/" + x for x in fs]
+    pred = [f"{argv[2]}/" + x.replace(".tsv", ".txt") for x in fs]
+
+    Path(argv[3]).mkdir(exist_ok=True, parents=True)
+    with open(f"{argv[3]}/errorLog_{classe}.txt", "w") as logger:
         total_hit = 0
         total_miss = 0
         total_err = 0
@@ -186,17 +189,22 @@ def main(argv, classe="", md="w", n_it='4'):
         logger.write(f"total accuracy: {total_hit/(total_hit + total_miss + total_err)}.\n")
         logger.write(f"total miss: {total_miss/(total_hit + total_miss + total_err)}.\n")
         logger.write(f"total err: {total_err/(total_hit + total_miss + total_err)}.\n")
-    print(conf_matrix)
 
     for k, v in astm.items():
-        new =  v[0] * (255.0/v[0].max())
-        Image.fromarray(new).convert("L").save(f"./aux{n_it}/{k}_mss.png")
-        with open(f"./aux{n_it}/{k}_mss.txt", md) as lg:
+        if v[0].max() == 0:
+            new = v[0]
+        else:
+            new = v[0] * (255.0/v[0].max())
+        Image.fromarray(new).convert("L").save(f"{argv[3]}/{k}_mss.png")
+        with open(f"{argv[3]}/{k}_mss.txt", md) as lg:
             lg.write(f"{v[1]}")
     for k, v in aste.items():
-        new = v[0] * (255.0/v[0].max())
-        Image.fromarray(new).convert("L").save(f"./aux{n_it}/{k}_err.png")
-        with open(f"./aux{n_it}/{k}_err.txt", md) as lg:
+        if v[0].max() == 0:
+            new = v[0]
+        else:
+            new = v[0] * (255.0 / v[0].max())
+        Image.fromarray(new).convert("L").save(f"{argv[3]}/{k}_err.png")
+        with open(f"{argv[3]}/{k}_err.txt", md) as lg:
             lg.write(f"{v[1]}")
 
     its = list(conf_matrix.keys())
@@ -237,16 +245,9 @@ def main(argv, classe="", md="w", n_it='4'):
                 drawer.text((idx_y, idx_x),'0')
 
 
-    bp.save(f"./aux{n_it}/conf_{classe}.png")
+    bp.save(f"{argv[3]}/conf_{classe}.png")
 
     return
 
 if __name__ == "__main__":
-    # for cl in ["CNH_Frente", "CNH_Verso", "CNH_Aberta"]:
-    #     main(sys.argv[1:], classe=cl, mode="w" if cl == "CNH_Aberta" else "a", n_it='4')
-    for cl in ["RG_Frente", "RG_Verso", "RG_Aberto"]:
-        if cl == "RG_Frente":
-            m = "w"
-        else:
-            m = "a"
-        main(sys.argv[1:], classe=cl, md=m, n_it='3')
+    main(sys.argv[1:], classe='RG', md='w')
