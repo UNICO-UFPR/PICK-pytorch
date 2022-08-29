@@ -36,16 +36,10 @@ class Trainer:
         '''
         self.config = config
         self.distributed = config['distributed']
-        if self.distributed:
-            self.local_master = (config['local_rank'] == 0)
-            self.global_master = (dist.get_rank() == 0)
-        else:
-            self.local_master = True
-            self.global_master = True
-        self.logger = config.get_logger('trainer', config['trainer']['log_verbosity']) if self.local_master else None
+        self.logger = config.get_logger('trainer', config['trainer']['log_verbosity'])
 
         # setup GPU device if available, move model into configured device
-        self.device, self.device_ids = self._prepare_device(config['local_rank'], config['local_world_size'])
+        self.device = self._prepare_device()
         self.model = model.to(self.device)
 
         self.optimizer = optimizer
@@ -85,10 +79,6 @@ class Trainer:
         # load checkpoint following load to multi-gpu, avoid 'module.' prefix
         if self.config['trainer']['sync_batch_norm'] and self.distributed:
             self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
-
-        if self.distributed:
-            self.model = DDP(self.model, device_ids=self.device_ids, output_device=self.device_ids[0],
-                            find_unused_parameters=True)
 
         self.data_loader = data_loader
         if max_len_step is None:  # max length of iteration step of every epoch
@@ -195,7 +185,6 @@ class Trainer:
         '''
         self.model.train()
         self.train_loss_metrics.reset()
-        ## step iteration start ##
         for step_idx, input_data_item in enumerate(self.data_loader):
             step_idx += 1
             for key, input_value in input_data_item.items():
@@ -273,9 +262,6 @@ class Trainer:
             if step_idx == self.len_step + 1:
                 break
 
-        ## step iteration end ##
-
-        # {'loss': avg_loss, 'gl_loss': avg_gl_loss, 'crf_loss': avg_crf_loss}
         log = self.train_loss_metrics.result()
 
         # do validation after training an epoch
@@ -314,10 +300,7 @@ class Trainer:
                 else:
                     best_paths = self.model.decoder.crf_layer.viterbi_tags(logits, mask=new_mask,
                                                                            logits_batch_first=True)
-                predicted_tags = []
-                for path, score in best_paths:
-                    predicted_tags.append(path)
-
+                predicted_tags = [path for path, score in best_paths]
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + step_idx, 'valid') \
                     if self.local_master else None
 
@@ -364,51 +347,18 @@ class Trainer:
     def logger_warning(self, msg):
         self.logger.warning(msg) if self.local_master else None
 
-    def _prepare_device(self, local_rank, local_world_size):
+    def _prepare_device(self):
         '''
          setup GPU device if available, move model into configured device
-        :param local_rank:
-        :param local_world_size:
-        :return:
+        :return device:
         '''
-        if self.distributed:
-            ngpu_per_process = torch.cuda.device_count() // local_world_size
-            device_ids = list(range(local_rank * ngpu_per_process, (local_rank + 1) * ngpu_per_process))
-
-            if torch.cuda.is_available() and local_rank != -1:
-                torch.cuda.set_device(device_ids[0])  # device_ids[0] =local_rank if local_world_size = n_gpu per node
-                device = 'cuda'
-                self.logger_info(
-                    f"[Process {os.getpid()}] world_size = {dist.get_world_size()}, "
-                    + f"rank = {dist.get_rank()}, n_gpu/process = {ngpu_per_process}, device_ids = {device_ids}"
-                )
-            else:
-                self.logger_warning('Training will be using CPU!')
-                device = 'cpu'
-            device = torch.device(device)
-            return device, device_ids
+        if torch.cuda.is_available() > 0:
+            self.logger_warning(f'Training is using GPU!')
+            device = 'cuda'
         else:
-            n_gpu = torch.cuda.device_count()
-            n_gpu_use = local_world_size
-            if n_gpu_use > 0 and n_gpu == 0:
-                self.logger_warning("Warning: There\'s no GPU available on this machine,"
-                                    "training will be performed on CPU.")
-                n_gpu_use = 0
-            if n_gpu_use > n_gpu:
-                self.logger_warning("Warning: The number of GPU\'s configured to use is {}, but only {} are available "
-                                    "on this machine.".format(n_gpu_use, n_gpu))
-                n_gpu_use = n_gpu
-
-            list_ids = list(range(n_gpu_use))
-            if n_gpu_use > 0:
-                torch.cuda.set_device(list_ids[0])  # only use first available gpu as devices
-                self.logger_warning(f'Training is using GPU {list_ids[0]}!')
-                device = 'cuda'
-            else:
-                self.logger_warning('Training is using CPU!')
-                device = 'cpu'
-            device = torch.device(device)
-            return device, list_ids
+            self.logger_warning('Training is using CPU!')
+            device = 'cpu'
+        return device
 
     def _save_checkpoint(self, epoch, save_best=False):
         '''
@@ -440,9 +390,9 @@ class Trainer:
             torch.save(state, best_path)
             self.logger_info("Saving current best: model_best.pth ...")
         else:
-            filename = str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(epoch))
+            filename = str(self.checkpoint_dir / f'checkpoint-epoch{epoch}.pth')
             torch.save(state, filename)
-            self.logger_info("Saving checkpoint: {} ...".format(filename))
+            self.logger_info(f"Saving checkpoint: {filename} ...")
 
     def _resume_checkpoint(self, resume_path):
         '''
@@ -456,6 +406,7 @@ class Trainer:
         checkpoint = torch.load(resume_path, map_location=self.device)
         self.start_epoch = checkpoint['epoch'] + 1
         self.monitor_best = checkpoint['monitor_best']
+
 
         # load architecture params from checkpoint.
         if checkpoint['config']['model_arch'] != self.config['model_arch']:

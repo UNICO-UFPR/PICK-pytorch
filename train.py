@@ -5,6 +5,7 @@
 import os
 import argparse
 import collections
+import logging
 
 import numpy as np
 import torch
@@ -32,13 +33,10 @@ np.random.seed(SEED)
 def main(config: ConfigParser, local_master: bool, logger=None):
     # setup dataset and data_loader instances
     train_dataset = config.init_obj('train_dataset', pick_dataset_module)
-    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) \
-        if config['distributed'] else None
 
     is_shuffle = False if config['distributed'] else True
     train_data_loader = config.init_obj('train_data_loader', torch.utils.data.dataloader,
                                         dataset=train_dataset,
-                                        sampler=train_sampler,
                                         shuffle=is_shuffle,
                                         collate_fn=BatchCollateFn())
 
@@ -148,7 +146,7 @@ if __name__ == '__main__':
                    help='batch size (default: 2)'),
         # CustomArgs(['--ng', '--n_gpu'], default=2, type=int, target='n_gpu',
         #            help='num of gpu (default: 2)'),
-        CustomArgs(['-dist', '--distributed'], default='true', type=str, target='distributed',
+        CustomArgs(['-dist', '--distributed'], default='false', type=str, target='distributed',
                    help='run distributed training. (true or false, default: true)'),
         CustomArgs(['--local_world_size'], default=1, type=int, target='local_world_size',
                    help='the number of processes running on each node, this is passed in explicitly '
@@ -160,4 +158,4 @@ if __name__ == '__main__':
     ]
     config = ConfigParser.from_args(args, options)
     # The main entry point is called directly without using subprocess, call by torch.distributed.launch.py
-    entry_point(config)
+    main(config, True, logging.getLogger(__name__))
